@@ -7,6 +7,14 @@ pub struct ConnectEvent {
     pub address: IpAddress,
 }
 
+#[derive(Clone, Copy)]
+#[repr(C)]
+pub struct SocketWriteEvent {
+    pub fd: i32,
+    pub _padding: [u8; 4],
+    pub bytes: u64,
+}
+
 impl ConnectEvent {
     pub fn new(fd: i32, port: u16, address: IpAddress) -> Self {
         Self {
@@ -14,6 +22,16 @@ impl ConnectEvent {
             port,
             address,
             _padding: [0; 2],
+        }
+    }
+}
+
+impl SocketWriteEvent {
+    pub fn new(fd: i32, bytes: u64) -> Self {
+        Self {
+            fd,
+            bytes,
+            _padding: [0; 4],
         }
     }
 }

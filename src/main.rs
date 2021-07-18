@@ -1,8 +1,9 @@
 use futures::StreamExt;
 use log::{error, info, LevelFilter};
-use probes::sockets::ConnectEvent;
+use probes::sockets::{ConnectEvent, SocketWriteEvent};
 use redbpf::load::{Loaded, Loader};
 use simple_logger::SimpleLogger;
+use std::collections::HashMap;
 use std::net::IpAddr;
 use std::{env, process, ptr};
 
@@ -13,20 +14,41 @@ fn sockets_probe_code() -> &'static [u8] {
     ))
 }
 
+fn process_connect_event(event: ConnectEvent) {
+    let address: IpAddr = event.address.into();
+    info!(
+        "Connect event, fd: {}, address: {}, port: {}",
+        event.fd, address, event.port
+    );
+}
+
+fn process_socket_write_event(event: SocketWriteEvent) {
+    info!(
+        "Socket write event, fd: {}, bytes: {}",
+        event.fd, event.bytes
+    );
+}
+
+fn proxy<T, F>(handler: F) -> Box<dyn Fn(Box<[u8]>) -> ()>
+where
+    F: Fn(T) -> () + 'static,
+{
+    let proxy_handler = move |event: Box<[u8]>| {
+        let parsed_event = unsafe { ptr::read(event.as_ptr() as *const T) };
+        handler(parsed_event)
+    };
+    Box::new(proxy_handler)
+}
+
 async fn process_events(mut loaded: Loaded) {
+    let mut handlers = HashMap::new();
+    handlers.insert("connect_event", proxy(process_connect_event));
+    handlers.insert("socket_write_event", proxy(process_socket_write_event));
     while let Some((name, events)) = loaded.events.next().await {
-        match name.as_str() {
-            "connect_event" => {
-                for event in events {
-                    let event = unsafe { ptr::read(event.as_ptr() as *const ConnectEvent) };
-                    let address: IpAddr = event.address.into();
-                    info!(
-                        "Connect event, fd: {}, address: {}, port: {}",
-                        event.fd, address, event.port
-                    );
-                }
+        if let Some(handler) = handlers.get(name.as_str()) {
+            for event in events {
+                handler(event);
             }
-            _ => {}
         }
     }
 }

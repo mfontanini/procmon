@@ -8,11 +8,8 @@ program!(0xFFFFFFFE, "GPL");
 #[map("connect_event")]
 static mut connect_event: PerfMap<ConnectEvent> = PerfMap::with_max_entries(1024);
 
-#[uprobe]
-fn connect(regs: Registers) {
-    let addr = unsafe { &*(regs.parm2() as *const sockaddr_in) };
-    process_connect_ipv4(regs, addr);
-}
+#[map("socket_write_event")]
+static mut socket_write_event: PerfMap<SocketWriteEvent> = PerfMap::with_max_entries(1024);
 
 #[inline]
 fn process_connect_ipv4(regs: Registers, addr: &sockaddr_in) -> Option<()> {
@@ -25,4 +22,22 @@ fn process_connect_ipv4(regs: Registers, addr: &sockaddr_in) -> Option<()> {
         connect_event.insert(regs.ctx, &event);
     }
     Some(())
+}
+
+// uprobes
+
+#[uprobe]
+fn connect(regs: Registers) {
+    let addr = unsafe { &*(regs.parm2() as *const sockaddr_in) };
+    process_connect_ipv4(regs, addr);
+}
+
+#[uprobe]
+fn send(regs: Registers) {
+    let fd = regs.parm1() as i32;
+    let bytes = regs.parm3();
+    let event = SocketWriteEvent::new(fd, bytes);
+    unsafe {
+        socket_write_event.insert(regs.ctx, &event);
+    }
 }
