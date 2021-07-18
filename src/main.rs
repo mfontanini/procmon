@@ -1,6 +1,6 @@
 use futures::StreamExt;
 use log::{error, info, LevelFilter};
-use probes::sockets::{ConnectEvent, SocketWriteEvent};
+use probes::fd::{FdWriteEvent, SocketConnectEvent};
 use redbpf::load::{Loaded, Loader};
 use simple_logger::SimpleLogger;
 use std::collections::HashMap;
@@ -8,13 +8,10 @@ use std::net::IpAddr;
 use std::{env, process, ptr};
 
 fn sockets_probe_code() -> &'static [u8] {
-    include_bytes!(concat!(
-        env!("OUT_DIR"),
-        "/target/bpf/programs/sockets/sockets.elf"
-    ))
+    include_bytes!(concat!(env!("OUT_DIR"), "/target/bpf/programs/fd/fd.elf"))
 }
 
-fn process_connect_event(event: ConnectEvent) {
+fn process_connect_event(event: SocketConnectEvent) {
     let address: IpAddr = event.address.into();
     info!(
         "Connect event, fd: {}, address: {}, port: {}",
@@ -22,11 +19,8 @@ fn process_connect_event(event: ConnectEvent) {
     );
 }
 
-fn process_socket_write_event(event: SocketWriteEvent) {
-    info!(
-        "Socket write event, fd: {}, bytes: {}",
-        event.fd, event.bytes
-    );
+fn process_fd_write_event(event: FdWriteEvent) {
+    info!("FD write event, fd: {}, bytes: {}", event.fd, event.bytes);
 }
 
 fn proxy<T, F>(handler: F) -> Box<dyn Fn(Box<[u8]>) -> ()>
@@ -43,7 +37,7 @@ where
 async fn process_events(mut loaded: Loaded) {
     let mut handlers = HashMap::new();
     handlers.insert("connect_event", proxy(process_connect_event));
-    handlers.insert("socket_write_event", proxy(process_socket_write_event));
+    handlers.insert("fd_write_event", proxy(process_fd_write_event));
     while let Some((name, events)) = loaded.events.next().await {
         if let Some(handler) = handlers.get(name.as_str()) {
             for event in events {

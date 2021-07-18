@@ -21,6 +21,6 @@ no-std = []
 path = "src/lib.rs"
 
 [[bin]]
-name = "sockets"
-path = "src/sockets/main.rs"
+name = "fd"
+path = "src/fd/main.rs"
 required-features = ["probes"]

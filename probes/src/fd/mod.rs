@@ -1,6 +1,6 @@
 #[derive(Clone, Copy)]
 #[repr(C)]
-pub struct ConnectEvent {
+pub struct SocketConnectEvent {
     pub fd: i32,
     pub port: u16,
     pub _padding: [u8; 2],
@@ -9,13 +9,13 @@ pub struct ConnectEvent {
 
 #[derive(Clone, Copy)]
 #[repr(C)]
-pub struct SocketWriteEvent {
+pub struct FdWriteEvent {
     pub fd: i32,
     pub _padding: [u8; 4],
     pub bytes: u64,
 }
 
-impl ConnectEvent {
+impl SocketConnectEvent {
     pub fn new(fd: i32, port: u16, address: IpAddress) -> Self {
         Self {
             fd,
@@ -26,7 +26,7 @@ impl ConnectEvent {
     }
 }
 
-impl SocketWriteEvent {
+impl FdWriteEvent {
     pub fn new(fd: i32, bytes: u64) -> Self {
         Self {
             fd,
